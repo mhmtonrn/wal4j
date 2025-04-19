@@ -1,5 +1,6 @@
 package io.mhmtonrn;
 
+import io.mhmtonrn.event.CDCEvent;
 import org.json.JSONObject;
 import org.postgresql.PGConnection;
 import org.postgresql.PGProperty;
@@ -7,6 +8,7 @@ import org.postgresql.replication.LogSequenceNumber;
 import org.postgresql.replication.PGReplicationStream;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
 import java.io.ByteArrayOutputStream;
@@ -34,10 +36,12 @@ public class ReplicationListener implements CommandLineRunner {
 
     @Value("${replication.db.publication}")
     private String publication;
+    private final ApplicationEventPublisher applicationEventPublisher;
 
     private final List<ReplicationEventHandler> handlers = new ArrayList<>();
 
-    public ReplicationListener() {
+    public ReplicationListener(ApplicationEventPublisher applicationEventPublisher) {
+        this.applicationEventPublisher = applicationEventPublisher;
         Map<Integer, RelationInfo> relationMap = new HashMap<>();
         handlers.add(new RelationHandler(relationMap));
         handlers.add(new InsertHandler(relationMap));
@@ -76,7 +80,7 @@ public class ReplicationListener implements CommandLineRunner {
                         if (handler.canHandle(tag)) {
                             JSONObject event = handler.handle(buffer);
                             if (event != null) {
-                                System.out.println(event);
+                                applicationEventPublisher.publishEvent(new CDCEvent(this,event.toString()));
                             }
                             break;
                         }
